@@ -479,8 +479,9 @@ class MainWindow(QWidget):
 
         imagebox2layout = QHBoxLayout()
 
-        imagebox2layout.addLayout(sliderImglayout3)
+
         imagebox2layout.addWidget(self.vtkLabel)
+        imagebox2layout.addLayout(sliderImglayout3)
 
         imagebox.addLayout(imageboxlayout)
         imagebox.addLayout(imagebox2layout)
