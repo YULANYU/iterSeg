@@ -7,12 +7,12 @@ from PyQt5.QtCore import *
 import nibabel as nib
 
 
-
 # 水平面
 class HorizontalWidget(QWidget):
     # 创建一个信号，该信号没有参数
     horizontal_signal = pyqtSignal(int)
     horizontal_click_signal = pyqtSignal(int)
+    horizontal_signal_horizontalLabel = pyqtSignal(int)
 
     def __init__(self, parent=None, img=None, index=None):
         super().__init__()
@@ -78,22 +78,28 @@ class HorizontalWidget(QWidget):
             if self.index < self.max_index:
                 self.index = self.index + 1
         self.update()
-        #print(event.pos().x())
-        #print(event.pos().y())
+        # print(event.pos().x())
+        # print(event.pos().y())
         self.horizontal_signal.emit(angle)
+        self.horizontal_signal_horizontalLabel.emit(self.index)
 
     def mousePressEvent(self, event):
         print("mouseMoveEvent called")
         self.hCenter = event.pos().x()
         self.vCenter = event.pos().y()
+        print(self.vCenter)
+        print(self.hCenter)
         self.update()
         self.horizontal_click_signal.emit(self.hCenter)
 
     def resizeEvent(self, event):
         print(456)
         self.update()
+
+
 # 矢状面
 class SagittalWidget(QWidget):
+    sagittal_signal_sagittalLabel = pyqtSignal(int)
     def __init__(self, parent=None, img=None, index=None):
         super().__init__()
         # 获取图像数据和头文件信息
@@ -161,11 +167,16 @@ class SagittalWidget(QWidget):
             if self.index < self.max_index:
                 self.index = self.index + 1
         self.update()
+        self.sagittal_signal_sagittalLabel.emit(self.index)
 
     def mousePressEvent(self, event):
         print("mouseMoveEvent called")
         self.hCenter = event.pos().x()
         self.vCenter = event.pos().y()
+        self.hCenter = event.pos().x()
+        self.vCenter = event.pos().y()
+        print(self.vCenter)
+        print(self.hCenter)
         self.update()
 
     def resizeEvent(self, event):
@@ -177,7 +188,7 @@ class SagittalWidget(QWidget):
         print('Signal received')
         if angle > 0:
             print("向上滚动")
-            if self.vCenter <= self.height()-1:
+            if self.vCenter <= self.height() - 1:
                 self.vCenter = self.vCenter + 1
         elif angle < 0:
             print("向下滚动")
@@ -186,8 +197,19 @@ class SagittalWidget(QWidget):
 
         print(self.vCenter)
         self.update()
+
+    @pyqtSlot(int)
+    def sagittal_click_slot(self, angle):
+        print('Click Signal received')
+        print(angle)
+        self.index = angle
+
+        self.update()
+
+
 # 冠状面
 class CoronalWidget(QWidget):
+    coronal_signal_coronalLabel = pyqtSignal(int)
     def __init__(self, parent=None, img=None, index=None):
         super().__init__()
         # 获取图像数据和头文件信息
@@ -257,6 +279,7 @@ class CoronalWidget(QWidget):
             if self.index < self.max_index:
                 self.index = self.index + 1
         self.update()
+        self.coronal_signal_coronalLabel.emit(self.index)
 
     def mousePressEvent(self, event):
         print("mouseMoveEvent called")
@@ -269,11 +292,11 @@ class CoronalWidget(QWidget):
         self.update()
 
     @pyqtSlot(int)
-    def coronal_slot(self,angle):
+    def coronal_slot(self, angle):
         print('Signal received')
         if angle > 0:
             print("向上滚动")
-            if self.vCenter <= self.height()-1:
+            if self.vCenter <= self.height() - 1:
                 self.vCenter = self.vCenter + 1
         elif angle < 0:
             print("向下滚动")
@@ -292,6 +315,69 @@ class CoronalWidget(QWidget):
         self.update()
 
 
+# 水平面切片label
+class HorizontalLabelWidget(QLabel):
+    def __init__(self, current_index=None, max_z_index=None):
+        super().__init__()
+
+        self.current_index = current_index
+        self.max_z_index = max_z_index
+        self.text = str(self.current_index) + ' of ' + str(self.max_z_index)
+        self.setText(self.text)
+        # 右对齐
+        self.setAlignment(Qt.AlignRight)
+        font = QFont('SimHei', 10)
+        self.setFont(font)
+
+    @pyqtSlot(int)
+    def update_label_slot(self, index):
+        self.current_index = index
+        self.text = str(self.current_index) + ' of ' + str(self.max_z_index)
+        self.setText(self.text)
+
+
+# 矢状面切片label
+class SagittalLabelWidget(QLabel):
+    def __init__(self, current_index=None, max_x_index=None):
+        super().__init__()
+
+        self.current_index = current_index
+        self.max_x_index = max_x_index
+        self.text = str(self.current_index) + ' of ' + str(self.max_x_index)
+        self.setText(self.text)
+        # 右对齐
+        self.setAlignment(Qt.AlignRight)
+        font = QFont('SimHei', 10)
+        self.setFont(font)
+
+    @pyqtSlot(int)
+    def update_label_slot1(self, index):
+        print("wolaole")
+        self.current_index = index
+        self.text = str(self.current_index) + ' of ' + str(self.max_x_index)
+        self.setText(self.text)
+
+
+
+# 冠状面切片label
+class CoronalLabelWidget(QLabel):
+    def __init__(self, current_index=None, max_y_index=None):
+        super().__init__()
+
+        self.current_index = current_index
+        self.max_y_index = max_y_index
+        self.text = str(self.current_index) + ' of ' + str(self.max_y_index)
+        self.setText(self.text)
+        # 右对齐
+        self.setAlignment(Qt.AlignRight)
+        font = QFont('SimHei', 10)
+        self.setFont(font)
+
+    @pyqtSlot(int)
+    def update_label_slot(self, index):
+        self.current_index = index
+        self.text = str(self.current_index) + ' of ' + str(self.max_y_index)
+        self.setText(self.text)
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -403,65 +489,76 @@ class MainWindow(QWidget):
         SaveLine.setFont(tipsFont)
 
         # 读取nii格式图像
-        img = nib.load('lung_002.nii')
+        img = nib.load('lung_001.nii.gz')
         self.data = img.get_fdata()
         self.header = img.header
         nii_affine = img.affine
         self.axis_order = nib.aff2axcodes(nii_affine)
-        # 水平面切片滑块
-        self.coronalSlider = QSlider(Qt.Horizontal, self)
-        self.coronalSlider.setMinimum(0)
-        z = self.header.get_data_shape()[2]
-        self.coronalSlider.setMaximum(z - 1)
-        self.coronalSlider.valueChanged.connect(self.get_coronal_image)
-        # 水平面
-        self.horizontalWidget = HorizontalWidget(self, img, z // 2)
-
-
-        sliderImglayout = QVBoxLayout()
-        sliderImglayout.addWidget(self.coronalSlider)
-        sliderImglayout.addWidget(self.horizontalWidget)
-
-        # 水平面滑块
+        # 1.水平面切片滑块
         self.horizontalSlider = QSlider(Qt.Horizontal, self)
         self.horizontalSlider.setMinimum(0)
+        z = self.header.get_data_shape()[2]
+        self.horizontalSlider.setMaximum(z - 1)
+        self.horizontalSlider.valueChanged.connect(self.get_coronal_image)
+        # 2.水平面
+        self.horizontalWidget = HorizontalWidget(self, img, z // 2)
+
+        # 3.水平面切片数展示
+        self.horizontalLabel = HorizontalLabelWidget(z // 2, z)
+
+        sliderImglayout = QVBoxLayout()
+        sliderImglayout.addWidget(self.horizontalSlider)
+        sliderImglayout.addWidget(self.horizontalWidget)
+        sliderImglayout.addWidget(self.horizontalLabel)
+
+        # 矢状面滑块
+        self.sagittalSlider = QSlider(Qt.Horizontal, self)
+        self.sagittalSlider.setMinimum(0)
         x = self.header.get_data_shape()[0]
 
-        self.horizontalSlider.setMaximum(z - 1)
-        self.horizontalSlider.valueChanged.connect(self.get_horizontal_image)
+        self.sagittalSlider.setMaximum(z - 1)
+        self.sagittalSlider.valueChanged.connect(self.get_horizontal_image)
 
         # 矢状面
         self.sagittalWidget = SagittalWidget(self, img, x // 2)
-        # self.get_horizontal_image(y // 2)
-        # self.horizontalLabel.setFixedSize(200, 200)  # 设置固定大小
-        # self.horizontalLabel.setPixmap(QPixmap.fromImage(QImage("logo.png")))
+
+        # 矢状面切片数展示
+        self.sagittalLabel = SagittalLabelWidget(x // 2, x)
 
         sliderImglayout2 = QVBoxLayout()
-        sliderImglayout2.addWidget(self.horizontalSlider)
+        sliderImglayout2.addWidget(self.sagittalSlider)
         sliderImglayout2.addWidget(self.sagittalWidget)
+        sliderImglayout2.addWidget(self.sagittalLabel)
 
-        # 3.矢状面滑块
-        self.sagittalSlider = QSlider(Qt.Horizontal, self)
-        self.sagittalSlider.setMinimum(0)
+        # 3.冠状面滑块
+        self.coronalSlider = QSlider(Qt.Horizontal, self)
+        self.coronalSlider.setMinimum(0)
 
-        self.sagittalSlider.setMaximum(z - 1)
-        self.sagittalSlider.valueChanged.connect(self.get_sagittal_image)
+        self.coronalSlider.setMaximum(z - 1)
+        self.coronalSlider.valueChanged.connect(self.get_sagittal_image)
         y = self.header.get_data_shape()[1]
         # 3.冠状面
         self.coronalWidget = CoronalWidget(self, img, y // 2)
-
+        # 矢状面切片数展示
+        self.coronalLabel = CoronalLabelWidget(y // 2, y)
         sliderImglayout3 = QVBoxLayout()
-        sliderImglayout3.addWidget(self.sagittalSlider)
+        sliderImglayout3.addWidget(self.coronalSlider)
         sliderImglayout3.addWidget(self.coronalWidget)
+        sliderImglayout3.addWidget(self.coronalLabel)
 
-        # 发信号 - 槽
+        # 水平面发信号 - 槽
         self.horizontalWidget.horizontal_signal.connect(self.sagittalWidget.sagittal_slot)
-
         self.horizontalWidget.horizontal_signal.connect(self.coronalWidget.coronal_slot)
-        #self.coronalWidget.coronal_click_signal.connect(self.horizontalWidget.horizontal_click_slot)
 
+        self.horizontalWidget.horizontal_click_signal.connect(self.sagittalWidget.sagittal_click_slot)
 
+        self.horizontalWidget.horizontal_signal_horizontalLabel.connect(self.horizontalLabel.update_label_slot)
 
+        # 矢状面发信号 - 槽
+        self.sagittalWidget.sagittal_signal_sagittalLabel.connect(self.sagittalLabel.update_label_slot1)
+
+        # 冠状面发信号 - 槽
+        self.coronalWidget.coronal_signal_coronalLabel.connect(self.coronalLabel.update_label_slot)
 
 
 
@@ -478,7 +575,6 @@ class MainWindow(QWidget):
         imageboxlayout.addLayout(sliderImglayout2)
 
         imagebox2layout = QHBoxLayout()
-
 
         imagebox2layout.addWidget(self.vtkLabel)
         imagebox2layout.addLayout(sliderImglayout3)
@@ -529,10 +625,11 @@ class MainWindow(QWidget):
         coronal_pixmap = QPixmap.fromImage(coronal_image)
         coronal_pixmap = coronal_pixmap.scaled(200, 200)  # 缩放图像
         # self.coronalLabel.setFixedSize(200, 200)  # 设置固定大小
-       # self.imageWidget = ImageWidget(self, coronal_image)
 
-        # self.coronalLabel.setPixmap(imageWidget.grab())
-        # return coronal_image
+    # self.imageWidget = ImageWidget(self, coronal_image)
+
+    # self.coronalLabel.setPixmap(imageWidget.grab())
+    # return coronal_image
 
     def get_horizontal_image(self, index):
         # 获取水平面图像数据 要显示轴状面，需要将图像在Y轴方向上的位置取中间的一层
