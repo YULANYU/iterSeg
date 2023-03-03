@@ -5,13 +5,17 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtGui import *
 from PyQt5.QtCore import *
 import nibabel as nib
-
+import math
 
 # 水平面
 class HorizontalWidget(QWidget):
     # 创建一个信号，该信号没有参数
     horizontal_signal = pyqtSignal(int)
-    horizontal_click_signal = pyqtSignal(int)
+    # 水平面-矢状面的鼠标点击的y值
+    horizontal_click_signal_sagittal = pyqtSignal(int)
+    # 水平面-冠状面的鼠标点击的x值
+    horizontal_click_signal_coronal = pyqtSignal(int)
+    # 更新自己slice index 的展示
     horizontal_signal_horizontalLabel = pyqtSignal(int)
 
     def __init__(self, parent=None, img=None, index=None):
@@ -25,8 +29,6 @@ class HorizontalWidget(QWidget):
         self.hCenter = self.width() / 2
         self.vCenter = self.width() / 2
         self.flag = 0
-        # scaleFactor属性用于存储当前图像的缩放比例，默认值为 1.0 表示不缩放
-        self.scaleFactor = 1.0
         self.setMouseTracking(True)
         self.setFixedSize(300, 300)
         self.setParent(parent)
@@ -36,7 +38,7 @@ class HorizontalWidget(QWidget):
             self.hCenter = self.width() / 2
             self.vCenter = self.height() / 2
             self.flag = 1
-        print("paintEvent called")
+       # print("paintEvent called")
         painter = QPainter(self)
         self.data = self.img.get_fdata()
         # print(self.data.shape)
@@ -45,17 +47,17 @@ class HorizontalWidget(QWidget):
         # 获取坐标轴编码
         self.axis_order = nib.aff2axcodes(self.img.affine)
         if self.axis_order != ('R', 'A', 'S'):
-            coronal_data = np.rot90(self.data[:, :, self.index])
+            horizontal_data = np.rot90(self.data[:, :, self.index])
         else:
-            coronal_data = self.data[:, :, self.index]
+            horizontal_data = self.data[:, :, self.index]
         # 将数据转换为8位无符号整数类型，并将像素值缩放到0-255范围内
-        coronal_data = np.uint8(255 * (coronal_data - coronal_data.min()) / (coronal_data.max() - coronal_data.min()))
+        horizontal_data = np.uint8(255 * (horizontal_data - horizontal_data.min()) / (horizontal_data.max() - horizontal_data.min()))
 
         # 将数据转换为QImage格式
-        height, width = coronal_data.shape
+        height, width = horizontal_data.shape
         bytesPerLine = width
-        coronal_image = QImage(coronal_data.data.tobytes(), width, height, bytesPerLine, QImage.Format_Grayscale8)
-        painter.drawImage(self.rect(), coronal_image)
+        horizontal_image = QImage(horizontal_data.data.tobytes(), width, height, bytesPerLine, QImage.Format_Grayscale8)
+        painter.drawImage(self.rect(), horizontal_image)
 
         # DashLine虚线   SolidLine实线
         pen = QPen(Qt.blue, 1, Qt.DashLine)
@@ -67,7 +69,7 @@ class HorizontalWidget(QWidget):
         painter.drawLine(0, self.vCenter, self.width(), self.vCenter)
 
     def wheelEvent(self, event: QWheelEvent) -> None:
-        print("wheelEvent called")
+        # print("wheelEvent called")
         angle = event.angleDelta().y()
         if angle > 0:
             print("向上滚动")
@@ -81,28 +83,45 @@ class HorizontalWidget(QWidget):
         # print(event.pos().x())
         # print(event.pos().y())
         self.horizontal_signal.emit(angle)
+
+
         self.horizontal_signal_horizontalLabel.emit(self.index)
 
     def mousePressEvent(self, event):
-        print("mouseMoveEvent called")
+
         self.hCenter = event.pos().x()
         self.vCenter = event.pos().y()
-        print(self.vCenter)
-        print(self.hCenter)
+
+
+        view_size = self.size().width()
+        image_size_height = self.data.shape[1]
+        img_size_width = self.data.shape[0]
+        slice_pos_x = int((self.hCenter / view_size) * image_size_height)
+        print("slice_pos_x",slice_pos_x)
+
+        slice_pos_y = int(((self.vCenter) / view_size) * img_size_width)
+        slice_pos_y = img_size_width - slice_pos_y
+        print("slice_pos_y", slice_pos_y)
+
+
+
+
         self.update()
-        self.horizontal_click_signal.emit(self.hCenter)
+        self.horizontal_click_signal_sagittal.emit(slice_pos_x)
+        self.horizontal_click_signal_coronal.emit(slice_pos_y)
 
     def resizeEvent(self, event):
-        print(456)
         self.update()
 
 
 # 矢状面
 class SagittalWidget(QWidget):
     sagittal_signal_sagittalLabel = pyqtSignal(int)
+
     def __init__(self, parent=None, img=None, index=None):
         super().__init__()
         # 获取图像数据和头文件信息
+        self.scale = None
         self.axis_order = None
         self.data = None
         self.max_index = None
@@ -111,6 +130,7 @@ class SagittalWidget(QWidget):
         self.hCenter = self.width() / 2
         self.vCenter = self.width() / 2
         self.flag = 0
+
         # scaleFactor属性用于存储当前图像的缩放比例，默认值为 1.0 表示不缩放
         self.scaleFactor = 1.0
         self.setMouseTracking(True)
@@ -122,12 +142,14 @@ class SagittalWidget(QWidget):
             self.hCenter = self.width() / 2
             self.vCenter = self.height() / 2
             self.flag = 1
-        print("paintEvent called")
+        # print("paintEvent called")
         painter = QPainter(self)
         self.data = self.img.get_fdata()
         # print(self.data.shape)
-        self.max_index = self.data.shape[2] - 1
-
+        self.max_index = self.data.shape[0] - 1
+        x = self.data.shape[0]
+        # 鼠标点击的位置/scale = 计算切片位置
+        self.scale = 300 / x
         # 获取坐标轴编码
         self.axis_order = nib.aff2axcodes(self.img.affine)
         # 获取矢状面图像数据 要显示矢状面，需要将图像在X轴方向上的位置取中间的一层
@@ -156,7 +178,7 @@ class SagittalWidget(QWidget):
         painter.drawLine(0, self.vCenter, self.width(), self.vCenter)
 
     def wheelEvent(self, event: QWheelEvent) -> None:
-        print("wheelEvent called")
+
         angle = event.angleDelta().y()
         if angle > 0:
             print("向上滚动")
@@ -170,22 +192,20 @@ class SagittalWidget(QWidget):
         self.sagittal_signal_sagittalLabel.emit(self.index)
 
     def mousePressEvent(self, event):
-        print("mouseMoveEvent called")
+        #print("mouseMoveEvent called")
         self.hCenter = event.pos().x()
         self.vCenter = event.pos().y()
-        self.hCenter = event.pos().x()
-        self.vCenter = event.pos().y()
+
         print(self.vCenter)
         print(self.hCenter)
         self.update()
 
     def resizeEvent(self, event):
-        print(456)
+
         self.update()
 
     @pyqtSlot(int)
     def sagittal_slot(self, angle):
-        print('Signal received')
         if angle > 0:
             print("向上滚动")
             if self.vCenter <= self.height() - 1:
@@ -199,20 +219,22 @@ class SagittalWidget(QWidget):
         self.update()
 
     @pyqtSlot(int)
-    def sagittal_click_slot(self, angle):
-        print('Click Signal received')
-        print(angle)
-        self.index = angle
+    def sagittal_click_slot(self, slice_pos_x):
 
+        print(slice_pos_x)
+        self.index = slice_pos_x
+        print(self.index)
         self.update()
 
 
 # 冠状面
 class CoronalWidget(QWidget):
     coronal_signal_coronalLabel = pyqtSignal(int)
+
     def __init__(self, parent=None, img=None, index=None):
         super().__init__()
         # 获取图像数据和头文件信息
+        self.scale = None
         self.axis_order = None
         self.data = None
         self.max_index = None
@@ -221,6 +243,7 @@ class CoronalWidget(QWidget):
         self.hCenter = self.width() / 2
         self.vCenter = self.width() / 2
         self.flag = 0
+
         # scaleFactor属性用于存储当前图像的缩放比例，默认值为 1.0 表示不缩放
         self.scaleFactor = 1.0
         self.setMouseTracking(True)
@@ -232,31 +255,33 @@ class CoronalWidget(QWidget):
             self.hCenter = self.width() / 2
             self.vCenter = self.height() / 2
             self.flag = 1
-        print("paintEvent called")
+        # print("paintEvent called")
         painter = QPainter(self)
         self.data = self.img.get_fdata()
-        # print(self.data.shape)
-        self.max_index = self.data.shape[2] - 1
-
+        # (512, 512, 304)
+        print(self.data.shape)
+        self.max_index = self.data.shape[1] - 1
+        self.scale = self.width() / self.data.shape[2]  # 300 / 512
         # 获取坐标轴编码
         self.axis_order = nib.aff2axcodes(self.img.affine)
         if self.axis_order != ('R', 'A', 'S'):
             # np.fliplr() 左右翻转 np.rot90()图像旋转90度或将图像沿水平或垂直轴进行翻转
-            horizontal_data = np.fliplr(np.rot90(self.data[:, self.index, :]))
+            coronal_data = np.fliplr(np.rot90(self.data[:, self.index, :]))
 
         else:
 
-            horizontal_data = self.data[:, self.index, :]
+            coronal_data = self.data[:, self.index, :]
 
             # 将数据转换为8位无符号整数类型，并将像素值缩放到0-255范围内
         horizontal_data = np.uint8(
-            255 * (horizontal_data - horizontal_data.min()) / (horizontal_data.max() - horizontal_data.min()))
+            255 * (coronal_data - coronal_data.min()) / (coronal_data.max() - coronal_data.min()))
 
         # 将数据转换为QImage格式
         height, width = horizontal_data.shape
         bytesPerLine = width
-        horizontal_image = QImage(horizontal_data.data.tobytes(), width, height, bytesPerLine, QImage.Format_Grayscale8)
-        painter.drawImage(self.rect(), horizontal_image)
+        coronal_image = QImage(horizontal_data.data.tobytes(), width, height, bytesPerLine, QImage.Format_Grayscale8)
+
+        painter.drawImage(self.rect(), coronal_image)
 
         # DashLine虚线   SolidLine实线
         pen = QPen(Qt.blue, 1, Qt.DashLine)
@@ -276,9 +301,10 @@ class CoronalWidget(QWidget):
                 self.index = self.index - 1
         elif angle < 0:
             print("向下滚动")
-            if self.index < self.max_index:
+            if self.index <= self.max_index - 1:
                 self.index = self.index + 1
         self.update()
+        print('fmax', self.max_index)
         self.coronal_signal_coronalLabel.emit(self.index)
 
     def mousePressEvent(self, event):
@@ -288,7 +314,7 @@ class CoronalWidget(QWidget):
         self.update()
 
     def resizeEvent(self, event):
-        print(456)
+
         self.update()
 
     @pyqtSlot(int)
@@ -307,11 +333,11 @@ class CoronalWidget(QWidget):
         self.update()
 
     @pyqtSlot(int)
-    def coronal_click_slot(self, angle):
+    def coronal_click_slot(self, slice_pos_y):
         print('Click Signal received')
-        print(angle)
-        self.index = self.index + angle
-
+        print(slice_pos_y)
+        self.index = slice_pos_y
+        print(self.index)
         self.update()
 
 
@@ -320,7 +346,7 @@ class HorizontalLabelWidget(QLabel):
     def __init__(self, current_index=None, max_z_index=None):
         super().__init__()
 
-        self.current_index = current_index
+        self.current_index = current_index + 1
         self.max_z_index = max_z_index
         self.text = str(self.current_index) + ' of ' + str(self.max_z_index)
         self.setText(self.text)
@@ -331,7 +357,7 @@ class HorizontalLabelWidget(QLabel):
 
     @pyqtSlot(int)
     def update_label_slot(self, index):
-        self.current_index = index
+        self.current_index = index + 1
         self.text = str(self.current_index) + ' of ' + str(self.max_z_index)
         self.setText(self.text)
 
@@ -341,8 +367,9 @@ class SagittalLabelWidget(QLabel):
     def __init__(self, current_index=None, max_x_index=None):
         super().__init__()
 
-        self.current_index = current_index
+        self.current_index = current_index + 1
         self.max_x_index = max_x_index
+        self.scale = 300 / self.max_x_index
         self.text = str(self.current_index) + ' of ' + str(self.max_x_index)
         self.setText(self.text)
         # 右对齐
@@ -351,12 +378,11 @@ class SagittalLabelWidget(QLabel):
         self.setFont(font)
 
     @pyqtSlot(int)
-    def update_label_slot1(self, index):
-        print("wolaole")
-        self.current_index = index
+    def update_label_slot(self, index):
+        self.current_index = index + 1
+
         self.text = str(self.current_index) + ' of ' + str(self.max_x_index)
         self.setText(self.text)
-
 
 
 # 冠状面切片label
@@ -364,8 +390,9 @@ class CoronalLabelWidget(QLabel):
     def __init__(self, current_index=None, max_y_index=None):
         super().__init__()
 
-        self.current_index = current_index
+        self.current_index = current_index + 1
         self.max_y_index = max_y_index
+        self.scale = 300 / self.max_y_index
         self.text = str(self.current_index) + ' of ' + str(self.max_y_index)
         self.setText(self.text)
         # 右对齐
@@ -375,9 +402,10 @@ class CoronalLabelWidget(QLabel):
 
     @pyqtSlot(int)
     def update_label_slot(self, index):
-        self.current_index = index
+        self.current_index = index + 1
         self.text = str(self.current_index) + ' of ' + str(self.max_y_index)
         self.setText(self.text)
+
 
 class MainWindow(QWidget):
     def __init__(self):
@@ -546,21 +574,26 @@ class MainWindow(QWidget):
         sliderImglayout3.addWidget(self.coronalWidget)
         sliderImglayout3.addWidget(self.coronalLabel)
 
-        # 水平面发信号 - 槽
+        # 水平面发信号 - 槽  水平面滚轮滑动
         self.horizontalWidget.horizontal_signal.connect(self.sagittalWidget.sagittal_slot)
         self.horizontalWidget.horizontal_signal.connect(self.coronalWidget.coronal_slot)
+        # 水平面发信号 - 槽  水平面点击 其他面切换切面
+        self.horizontalWidget.horizontal_click_signal_sagittal.connect(self.sagittalWidget.sagittal_click_slot)
+        self.horizontalWidget.horizontal_click_signal_coronal.connect(self.coronalWidget.coronal_click_slot)
 
-        self.horizontalWidget.horizontal_click_signal.connect(self.sagittalWidget.sagittal_click_slot)
-
+        # 水平面发信号 - 槽  水平面滚轮滑动 自己的切片展示
         self.horizontalWidget.horizontal_signal_horizontalLabel.connect(self.horizontalLabel.update_label_slot)
 
-        # 矢状面发信号 - 槽
-        self.sagittalWidget.sagittal_signal_sagittalLabel.connect(self.sagittalLabel.update_label_slot1)
+        # 水平面发信号 - 槽  水平面点击 其他面切换的label展示
 
+        self.horizontalWidget.horizontal_click_signal_sagittal.connect(self.sagittalLabel.update_label_slot)
+        self.horizontalWidget.horizontal_click_signal_coronal.connect(self.coronalLabel.update_label_slot)
+
+        # 矢状面发信号 - 槽
+        self.sagittalWidget.sagittal_signal_sagittalLabel.connect(self.sagittalLabel.update_label_slot)
+        self.horizontalWidget.horizontal_click_signal_sagittal.connect(self.sagittalLabel.update_label_slot)
         # 冠状面发信号 - 槽
         self.coronalWidget.coronal_signal_coronalLabel.connect(self.coronalLabel.update_label_slot)
-
-
 
         self.vtkLabel = QLabel()
         # vtk_image = self.get_sagittal_image(data, header)
